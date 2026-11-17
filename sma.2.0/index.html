@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMA Core - Space Medical Assistent</title>
+<style>
+  :root {
+    --page:#0b2239; --glass:rgba(9,36,64,.80); --line:rgba(80,140,200,.45);
+    --text:#ffffff; --label:#dbe7f4; --muted:#8fa6bf;
+    --orange:#f5a623; --ok:#3ddc97; --warn:#ff5d5d; --lost:#8fa6bf;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { background:var(--page); color:var(--text); font-family:"Segoe UI", system-ui, Arial, sans-serif; padding:24px; }
+
+  /* ---------- Сцена ---------- */
+  .stage { position:relative; max-width:1500px; min-height:820px; margin:0 auto; border-radius:20px; overflow:hidden;
+    background:
+      radial-gradient(ellipse 60% 45% at 18% 108%, rgba(120,150,190,.35), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 85% -10%, rgba(30,70,130,.35), transparent 70%),
+      #03060c; }
+  .sky { position:absolute; left:0; top:0; width:2px; height:2px; background:transparent; border-radius:50%; }
+  .panel-art { position:absolute; left:26%; bottom:70px; width:46%; height:120px; transform:perspective(500px) rotateX(48deg) rotateZ(-4deg); opacity:.85;
+    background:
+      repeating-linear-gradient(90deg, rgba(180,205,255,.35) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(0deg, rgba(180,205,255,.30) 0 1px, transparent 1px 22px),
+      linear-gradient(135deg, #1a3f8f, #0e2760 60%, #16367d);
+    border:2px solid rgba(200,215,240,.55); border-radius:4px; box-shadow:0 0 60px rgba(60,110,220,.25); }
+  .hud { position:relative; z-index:2; display:grid; grid-template-columns:300px 1fr 300px; gap:20px; padding:36px 40px 40px; min-height:820px; }
+  .col { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .center { justify-content:space-between; }
+
+  /* ---------- Карточка-«стекло» ---------- */
+  .card { background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:12px 16px;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.03); }
+  .card .lab { display:flex; align-items:center; gap:7px; font-family:Optima, Candara, "Segoe UI", sans-serif; font-size:15px; color:var(--label); }
+  .card .val { font-size:40px; font-weight:700; line-height:1.1; padding:6px 0 2px 14px; }
+  .card .val small { font-size:15px; font-weight:700; color:var(--label); margin-left:4px; }
+  .card.warn { border-color:var(--warn); animation:pulse 1.2s infinite; }
+  .card.lost { opacity:.6; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(255,93,93,.5); } 50% { box-shadow:0 0 0 6px rgba(255,93,93,0); } }
+  .ico { width:18px; height:18px; stroke:var(--label); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+  /* ---------- Левая колонка ---------- */
+  .who { display:flex; justify-content:space-between; align-items:center; }
+  .who b { font-size:18px; }
+  .stat { font-size:13px; display:flex; align-items:center; gap:6px; }
+  .stat i { width:9px; height:9px; border-radius:50%; background:var(--ok); display:inline-block; }
+  .stat.warn i { background:var(--warn); } .stat.lost i { background:var(--lost); }
+  .dev { font-size:12px; color:var(--muted); margin-top:2px; }
+  .why { margin-top:6px; font-size:13px; color:var(--warn); min-height:16px; }
+  .hr { display:flex; gap:10px; align-items:stretch; }
+  .hr .left { flex:0 0 auto; }
+  .trace { flex:1; min-width:90px; border:1px solid var(--line); border-radius:10px; background:rgba(5,20,38,.55); margin-top:4px; }
+  .trace svg { width:100%; height:100%; display:block; }
+
+  /* ---------- Центр ---------- */
+  .tops { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .tops .card { min-width:190px; }
+  .tops .val { font-size:34px; }
+  .title { text-align:center; margin-top:14px; font-size:13px; letter-spacing:3px; color:var(--label); text-shadow:0 1px 8px #000; }
+  .title small { display:block; letter-spacing:0; color:var(--muted); font-size:12px; margin-top:3px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--label); padding:3px 10px; border:1px solid var(--line); border-radius:20px; background:rgba(9,36,64,.6); margin:6px 4px 0; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--lost); display:inline-block; } .dot.on { background:var(--ok); }
+
+  .ask h2 { margin:0 0 10px; font-size:15px; font-weight:500; color:var(--label); font-family:Optima, Candara, "Segoe UI", sans-serif; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row + .row { margin-top:8px; }
+  button { background:var(--orange); color:#1a1200; border:none; border-radius:10px; padding:9px 14px; font-size:14px; cursor:pointer; font-weight:700; }
+  button.sec { background:transparent; color:var(--label); border:1px solid var(--line); }
+  input, select { background:rgba(5,20,38,.75); border:1px solid var(--line); border-radius:10px; padding:9px 12px; color:var(--text); font-size:14px; }
+  input { flex:1; min-width:180px; } select { max-width:100%; }
+  .answer { margin-top:12px; font-size:14.5px; line-height:1.5; white-space:pre-wrap; max-height:230px; overflow:auto; }
+  .answer .q { color:var(--muted); font-size:13px; }
+
+  /* ---------- Правая колонка ---------- */
+  .crew { display:flex; flex-direction:column; gap:14px; }
+  .member { display:flex; gap:12px; padding:8px; cursor:pointer; }
+  .member.sel { box-shadow:0 0 0 2px var(--orange); }
+  .avatar { width:88px; height:72px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:30px; font-weight:700; background:linear-gradient(145deg, #2a5f9c, #11335a); border:1px solid var(--line); }
+  .member .info { flex:1; min-width:0; }
+  .member .name { font-family:Optima, Candara, "Segoe UI", sans-serif; font-size:15px; }
+  .member .vals { font-size:12px; color:var(--muted); margin-top:1px; }
+  .bars { margin-top:4px; }
+  .bottom { margin-top:auto; }
+  .clock { font-size:34px; font-weight:700; padding:4px 0 6px; }
+  .clock small { font-size:15px; color:var(--label); margin-left:4px; }
+  ul.ev { list-style:none; margin:0; padding:0; font-size:13px; max-height:130px; overflow:auto; }
+  ul.ev li { padding:5px 0; border-top:1px solid rgba(80,140,200,.25); }
+  ul.ev li span { color:var(--orange); margin-right:8px; }
+
+  .card.crit { border-color:#ff2d2d; background:rgba(90,10,20,.85); animation:pulse .8s infinite; }
+  .stat.crit i { background:#ff2d2d; }
+  .tst { font-size:11px; color:var(--orange); border:1px solid var(--orange); border-radius:8px; padding:0 6px; margin-left:6px; }
+  .sub { font-size:12px; color:var(--muted); padding:0 0 2px 14px; }
+  .demo h2 { margin:0 0 10px; font-size:15px; font-weight:500; color:var(--label); font-family:Optima, Candara, "Segoe UI", sans-serif; }
+
+  /* ---------- Пульс с камеры ---------- */
+  .pc .bpmrow { display:flex; align-items:baseline; gap:10px; margin-top:6px; }
+  .pc #pc-bpm { font-size:64px; font-weight:700; line-height:1; color:var(--warn); font-variant-numeric:tabular-nums; }
+  .pc .unit { color:var(--muted); }
+  .pc #pc-state { margin-left:auto; font-size:13px; color:var(--muted); text-align:right; }
+  .pc canvas { width:100%; height:110px; display:block; margin-top:10px; background:rgba(5,20,38,.75); border-radius:8px; }
+  .pc .bar { height:6px; background:rgba(80,140,200,.3); border-radius:3px; margin-top:12px; overflow:hidden; }
+  .pc #pc-prog { height:100%; width:0; background:var(--warn); transition:width .3s; }
+  .pc .hint { font-size:12.5px; color:var(--muted); margin-top:10px; line-height:1.5; }
+  .pc .hint a { color:var(--orange); word-break:break-all; }
+  .pc #pc-ai { margin-top:10px; font-size:14px; line-height:1.5; white-space:pre-wrap; }
+  .pc #pc-log { font-size:13px; color:var(--muted); margin-top:8px; min-height:18px; }
+  #pc-vid { position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.danger { background:var(--warn); color:#fff; }
+  .only-pulse { display:none; text-align:center; font-size:13px; letter-spacing:3px; color:var(--label); }
+  body.pulse-only { padding:10px; }
+  body.pulse-only .stage { min-height:0; }
+  body.pulse-only .hud { grid-template-columns:1fr; padding:16px 12px; min-height:0; }
+  body.pulse-only .col:not(.center), body.pulse-only .center > :not(#pulsecard):not(.only-pulse) { display:none; }
+  body.pulse-only .only-pulse { display:block; }
+  body.pulse-only .panel-art { display:none; }
+
+  @media (max-width:1050px) {
+    body { padding:10px; }
+    .hud { grid-template-columns:1fr; padding:20px 16px; min-height:0; }
+    .stage { min-height:0; }
+    .panel-art { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="sky" id="sky"></div>
+
+  <div class="hud">
+
+    <!-- Левая колонка: выбранный астронавт -->
+    <div class="col" id="left">
+      <div class="card">Ожидание данных от устройств...</div>
+    </div>
+
+    <!-- Центр -->
+    <div class="col center">
+      <div class="only-pulse">SPACE MEDICAL ASSISTENT (SMA)</div>
+      <div>
+        <div class="tops">
+          <div class="card"><div class="lab"><svg class="ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/></svg>Экипаж на связи</div><div class="val" id="onl">0</div></div>
+          <div class="card"><div class="lab"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v5M12 17.5v.5"/></svg>Предупреждения</div><div class="val" id="wrn">0</div></div>
+        </div>
+        <div class="title">SPACE MEDICAL ASSISTENT (SMA)<small>CREW MONITORING SYSTEM · SMA Core</small>
+          <div><span class="chip"><span class="dot" id="dot"></span><span id="srv">сервер: нет связи</span></span><span class="chip" id="ai">ИИ: ...</span><span class="chip"><span class="dot" id="wdot"></span><span id="watch">часы: нет связи</span></span></div>
+        </div>
+      </div>
+
+      <div class="card ask">
+        <h2>Спросить SMA</h2>
+        <div class="row">
+          <button id="mic">Голос</button>
+          <input id="text" placeholder="Напишите: пульс астронавта 2, отчёт, что делать при гипоксии">
+          <button class="sec" id="send">Отправить</button>
+          <button class="sec" id="alerts">Голосовые оповещения: выкл</button>
+        </div>
+        <div class="row">
+          <select id="cond"><option value="">Что делать при болезни или состоянии...</option></select>
+        </div>
+        <div class="answer" id="answer"></div>
+      </div>
+
+      <div class="card pc" id="pulsecard">
+        <div class="lab"><svg class="ico" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9.2C1.8 7.6 4 4.5 7 4.5c2 0 3.5 1 5 3 1.5-2 3-3 5-3 3 0 5.2 3.1 4 6.3C19 15.6 12 20 12 20z"/></svg>Пульс по камере телефона</div>
+        <div class="row" style="margin-top:8px">
+          <select id="pc-ast" title="Чей это пульс"></select>
+        </div>
+        <div class="bpmrow"><span id="pc-bpm">—</span><span class="unit">уд/мин</span><span id="pc-state">Нажмите «Начать»</span></div>
+        <canvas id="pc-wave" width="600" height="110" aria-label="График пульса"></canvas>
+        <div class="bar"><div id="pc-prog"></div></div>
+        <div class="row" style="margin-top:12px">
+          <button id="pc-start">Начать</button>
+          <button class="sec" id="pc-stop" disabled>Стоп</button>
+          <button class="sec" id="pc-ai-btn" disabled>ИИ-анализ</button>
+        </div>
+        <div id="pc-log"></div>
+        <div id="pc-ai"></div>
+        <div class="hint">Закройте пальцем камеру и вспышку, прижимайте легко, не двигайтесь 30 секунд. Результат сам попадёт на панель и заменит пульс устройства на 90 секунд.<span id="pc-link"></span></div>
+      </div>
+
+      <div class="card demo">
+        <h2>Демо-события и отчёт</h2>
+        <div class="row">
+          <button class="sec" data-ev="solar_flare">Солнечная вспышка</button>
+          <button class="sec" data-ev="fall">Падение</button>
+          <button class="sec" data-ev="connection_lost">Потеря связи</button>
+          <button class="sec" data-ev="clear">Сброс</button>
+          <button id="report">Отчёт для медкоманды</button>
+          <button class="sec" id="vibe">Тест вибро на часах</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Правая колонка: экипаж, время, журнал -->
+    <div class="col">
+      <div class="crew" id="crew"></div>
+      <div class="card bottom">
+        <div class="lab">Локальное время</div>
+        <div class="clock" id="clock">--:--</div>
+        <div class="lab" style="margin-bottom:4px">Журнал предупреждений</div>
+        <ul class="ev" id="events"><li>Пока нет событий</li></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const STATUS = { NORMAL:["Норма",""], WARNING:["Предупреждение","warn"], CRITICAL:["Критично","crit"], CONNECTION_LOST:["Связь потеряна","lost"] };
+const MOTION = { rest:"Покой", moving:"Движение", fall:"Падение", no_sensor:"Нет датчика" };
+const AI_NAME = { gemini:"Gemini", claude:"Claude", ollama:"локальная модель" };
+const PHASE = { launch:"Старт", orbit:"Орбита", deep_space:"Дальний космос", landing:"Посадка" };
+const SRC = { sim:"симуляция", camera:"камера телефона", button:"кнопка" };
+const TST = '<span class="tst">тест</span>';
+let wsOk = false;
+let voiceAlerts = false;
+let seen = null;
+let selected = null;
+let lastData = null;
+
+const ICON = {
+  heart:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9.2C1.8 7.6 4 4.5 7 4.5c2 0 3.5 1 5 3 1.5-2 3-3 5-3 3 0 5.2 3.1 4 6.3C19 15.6 12 20 12 20z"/></svg>',
+  o2:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 12h6"/></svg>',
+  move:'<svg class="ico" viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="2"/><path d="M8 21l3-7-3-3 3-4 4 3 3 1M11 14l4 3 1 4"/></svg>',
+  link:'<svg class="ico" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0M7.5 12a4.5 4.5 0 0 1 9 0"/><circle cx="12" cy="12.5" r="1.3"/></svg>',
+};
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+/* Пульс по истории: оранжевая линия */
+function trace(h) {
+  if (h.length < 2) return '<svg viewBox="0 0 160 60"></svg>';
+  const w = 160, ht = 60, lo = 40, hi = 130, a = h.slice(-40);
+  const pts = a.map((v, i) => {
+    const x = (i / (a.length - 1)) * w;
+    const y = ht - 6 - ((Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * (ht - 12);
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  return `<svg viewBox="0 0 ${w} ${ht}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="#f5a623" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+
+/* Столбики из оранжевых штрихов: последние 7 значений пульса */
+function bars(h) {
+  const a = h.slice(-7);
+  if (!a.length) return "";
+  const colW = 14, gap = 5, rowH = 5, rowGap = 3, maxRows = 5, lo = 40, hi = 130;
+  const W = a.length * (colW + gap), H = maxRows * (rowH + rowGap);
+  let out = "";
+  a.forEach((v, i) => {
+    const n = 1 + Math.round(((Math.min(Math.max(v, lo), hi) - lo) / (hi - lo)) * (maxRows - 1));
+    for (let r = 0; r < n; r++) {
+      const y = H - (r + 1) * (rowH + rowGap) + rowGap;
+      out += `<rect x="${i * (colW + gap)}" y="${y}" width="${colW}" height="${rowH}" rx="2" fill="#f5a623"/>`;
+    }
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${out}</svg>`;
+}
+
+function renderLeft(c) {
+  const [label, cls] = STATUS[c.status];
+  const sub = cls === "lost" ? "lost" : "";
+  const simHr = c.hr_source === "sim";
+  const temp = c.temperature === null || c.temperature === undefined ? "—" : c.temperature.toFixed(1);
+  document.getElementById("left").innerHTML = `
+    <div class="card ${cls}">
+      <div class="who"><b>${esc(c.astronaut)}</b><span class="stat ${cls}"><i></i>${label}</span></div>
+      <div class="dev">${esc(c.device_id)} · ${esc(PHASE[c.phase] || c.phase)}</div>
+      <div class="why">${esc(c.reasons.join(", "))}</div>
+    </div>
+    <div class="card ${sub}">
+      <div class="hr">
+        <div class="left"><div class="lab">${ICON.heart}Пульс${simHr ? TST : ""}</div><div class="val">${esc(c.hr)}<small>уд/мин</small></div></div>
+        <div class="trace">${trace(c.history)}</div>
+      </div>
+      <div class="sub">источник: ${esc(SRC[c.hr_source] || c.hr_source)} · ваша норма ≈ ${esc(c.baseline)}</div>
+    </div>
+    <div class="card ${sub}"><div class="lab">${ICON.o2}Кислород в крови (SpO₂)${TST}</div><div class="val">${esc(c.spo2)}<small>%</small></div></div>
+    <div class="card ${sub}"><div class="lab">Температура${TST}</div><div class="val">${esc(temp)}<small>°C</small></div></div>
+    <div class="card ${sub}"><div class="lab">Радиация${TST}</div><div class="val">${esc(c.radiation)}<small>мкЗв/ч</small></div><div class="sub">накоплено ${esc(c.dose)} мЗв</div></div>
+    <div class="card ${sub}"><div class="lab">${ICON.move}Движение</div><div class="val" style="font-size:28px">${esc(MOTION[c.motion] || c.motion)}</div></div>
+    <div class="card ${sub}"><div class="lab">${ICON.link}Последние данные</div><div class="val">${esc(c.age)}<small>сек назад</small></div></div>`;
+}
+
+function render(d) {
+  lastData = d;
+
+  document.getElementById("onl").innerHTML = d.crew.filter(c => c.status !== "CONNECTION_LOST").length + `<small>из ${d.crew.length}</small>`;
+  document.getElementById("wrn").textContent = d.crew.filter(c => c.status === "WARNING" || c.status === "CRITICAL").length;
+  document.getElementById("ai").textContent = "ИИ: " + (AI_NAME[d.ai] || "офлайн-справочник");
+  if (window.pulseCrew) window.pulseCrew(d.crew.map(c => c.astronaut));
+
+  if (d.crew.length) {
+    if (!selected || !d.crew.find(c => c.astronaut === selected)) {
+      selected = (d.crew.find(c => c.status === "WARNING") || d.crew[0]).astronaut;
+    }
+    renderLeft(d.crew.find(c => c.astronaut === selected));
+
+    document.getElementById("crew").innerHTML = d.crew.map(c => {
+      const cls = STATUS[c.status][1];
+      const num = c.astronaut.replace(/\D/g, "").replace(/^0+/, "") || "?";
+      return `<div class="card member ${cls} ${c.astronaut === selected ? "sel" : ""}" data-id="${esc(c.astronaut)}">
+        <div class="avatar">${esc(num)}</div>
+        <div class="info">
+          <div class="name">${esc(c.astronaut)}</div>
+          <div class="vals">${esc(c.hr)} уд/мин · SpO₂ ${esc(c.spo2)}% · ${STATUS[c.status][0]}</div>
+          <div class="bars">${bars(c.history)}</div>
+        </div></div>`;
+    }).join("");
+    document.querySelectorAll(".member").forEach(el => {
+      el.onclick = () => { selected = el.dataset.id; render(lastData); };
+    });
+  }
+
+  const ev = document.getElementById("events");
+  ev.innerHTML = d.events.length
+    ? d.events.map(e => `<li><span>${esc(e.time)}</span>${esc(e.text)}</li>`).join("")
+    : "<li>Пока нет событий</li>";
+
+  const keys = d.events.map(e => e.time + e.text);
+  if (seen === null) {
+    seen = new Set(keys);
+  } else {
+    d.events.forEach(e => {
+      const k = e.time + e.text;
+      if (!seen.has(k)) {
+        seen.add(k);
+        if (voiceAlerts && e.level !== "INFO") speak("Внимание. " + e.text);
+      }
+    });
+  }
+}
+
+function setServer(on) {
+  document.getElementById("dot").classList.toggle("on", on);
+  document.getElementById("srv").textContent = on ? (wsOk ? "сервер: онлайн (WebSocket)" : "сервер: онлайн") : "сервер: нет связи";
+}
+
+function connectWS() {
+  try {
+    const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+    ws.onopen = () => { wsOk = true; };
+    ws.onmessage = e => { render(JSON.parse(e.data)); setServer(true); };
+    ws.onclose = () => { wsOk = false; setTimeout(connectWS, 3000); };
+    ws.onerror = () => ws.close();
+  } catch (e) {}
+}
+
+/* Запасной вариант: если WebSocket недоступен, опрашиваем сервер раз в секунду */
+async function refresh() {
+  if (wsOk) return;
+  try {
+    const r = await fetch("/api/state");
+    render(await r.json());
+    setServer(true);
+  } catch (e) {
+    setServer(false);
+  }
+}
+
+function speak(t) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.lang = "ru-RU";
+  speechSynthesis.speak(u);
+}
+
+async function ask(q) {
+  const out = document.getElementById("answer");
+  out.innerHTML = `<div class="q">Вопрос: ${esc(q)}</div>...`;
+  try {
+    const r = await fetch("/api/ask?q=" + encodeURIComponent(q));
+    const d = await r.json();
+    out.innerHTML = `<div class="q">Вопрос: ${esc(q)}</div>${esc(d.answer)}`;
+    speak(d.answer);
+  } catch (e) {
+    out.textContent = "Нет связи с сервером SMA Core.";
+  }
+}
+
+document.getElementById("mic").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const out = document.getElementById("answer");
+  if (!SR) { out.textContent = "Распознавание речи работает в Chrome. Используйте текстовое поле."; return; }
+  const rec = new SR();
+  rec.lang = "ru-RU";
+  rec.onstart = () => { out.textContent = "Слушаю..."; };
+  rec.onresult = e => ask(e.results[0][0].transcript);
+  rec.onerror = e => { out.textContent = "Ошибка микрофона: " + e.error; };
+  rec.start();
+};
+
+document.getElementById("send").onclick = () => {
+  const t = document.getElementById("text");
+  if (t.value.trim()) { ask(t.value.trim()); t.value = ""; }
+};
+document.getElementById("text").onkeydown = e => { if (e.key === "Enter") document.getElementById("send").click(); };
+
+document.getElementById("alerts").onclick = e => {
+  voiceAlerts = !voiceAlerts;
+  e.target.textContent = "Голосовые оповещения: " + (voiceAlerts ? "вкл" : "выкл");
+  if (voiceAlerts) speak("Голосовые оповещения включены");
+};
+
+async function loadConditions() {
+  try {
+    const r = await fetch("/api/conditions");
+    const d = await r.json();
+    const sel = document.getElementById("cond");
+    d.conditions.forEach(c => {
+      const o = document.createElement("option");
+      o.value = c.title;
+      o.textContent = c.title;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => {
+      if (sel.value) { ask("что делать при " + sel.value); sel.value = ""; }
+    };
+  } catch (e) {}
+}
+
+/* Звёзды на фоне */
+(function stars() {
+  const W = 1500, H = 900, n = 150, s = [];
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(Math.random() * W), y = Math.floor(Math.random() * H);
+    const a = (0.25 + Math.random() * 0.7).toFixed(2);
+    s.push(`${x}px ${y}px 0 0 rgba(255,255,255,${a})`);
+  }
+  document.getElementById("sky").style.boxShadow = s.join(",");
+})();
+
+/* Часы */
+function tick() {
+  const d = new Date();
+  document.getElementById("clock").textContent = d.toLocaleTimeString("ru-RU", { hour:"2-digit", minute:"2-digit" });
+}
+tick(); setInterval(tick, 10000);
+
+document.querySelectorAll("[data-ev]").forEach(b => {
+  b.onclick = async () => {
+    const ev = b.dataset.ev;
+    const target = (ev === "solar_flare" || ev === "clear") ? "all" : (selected || "all");
+    try {
+      await fetch("/api/sim/event", { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ event: ev, astronaut: target }) });
+    } catch (e) {}
+  };
+});
+
+document.getElementById("report").onclick = async () => {
+  const out = document.getElementById("answer");
+  try {
+    const r = await fetch("/api/report");
+    const d = await r.json();
+    out.innerHTML = `<div class="q">Отчёт для медицинской команды</div>${esc(d.text)}`;
+  } catch (e) {
+    out.textContent = "Нет связи с сервером SMA Core.";
+  }
+};
+
+/* Вибромотор: тест и статус моста с ESP32 */
+document.getElementById("vibe").onclick = async () => {
+  const out = document.getElementById("answer");
+  try {
+    await fetch("/api/notify", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ text:"Тест вибромотора", level:"INFO" }) });
+    out.innerHTML = `<div class="q">Уведомление отправлено</div>Если часы (ESP32) подключены по USB, вибромотор сработает через 1-2 секунды.`;
+  } catch (e) { out.textContent = "Нет связи с сервером SMA Core."; }
+};
+
+async function loadInfo() {
+  try {
+    const d = await (await fetch("/api/info")).json();
+    document.getElementById("wdot").classList.toggle("on", d.watch_online);
+    document.getElementById("watch").textContent = d.watch_online ? "часы: вибро готово" : "часы: не подключены";
+    const l = document.getElementById("pc-link");
+    if (l && !l.dataset.set) {
+      l.dataset.set = "1";
+      l.innerHTML = ` Для телефона откройте <a href="${esc(d.phone_url)}">${esc(d.phone_url)}</a>` +
+        (d.https ? " (браузер предупредит о сертификате: «Дополнительно» → «Всё равно перейти»)." : " (камера по http может не включиться).");
+    }
+  } catch (e) {}
+}
+loadInfo(); setInterval(loadInfo, 4000);
+
+/* Пульс по камере: фотоплетизмография (палец на камере и вспышке) */
+(function () {
+  const $ = id => document.getElementById(id);
+  if (location.pathname.indexOf("/pulse") === 0 || location.hash === "#pulse") document.body.classList.add("pulse-only");
+
+  const vid = document.createElement("video");
+  vid.id = "pc-vid"; vid.setAttribute("playsinline", ""); vid.muted = true;
+  document.body.appendChild(vid);
+  const wave = $("pc-wave"), wctx = wave.getContext("2d");
+  const cv = document.createElement("canvas"); cv.width = cv.height = 24;
+  const cx = cv.getContext("2d", { willReadFrequently:true });
+  let stream = null, timer = null, t0 = 0, S = [], lastBpm = null, finalBpm = null, lastLive = 0;
+  const DUR = 30000;
+  const setState = t => { $("pc-state").textContent = t; };
+
+  /* Список астронавтов для выбора */
+  const sel = $("pc-ast");
+  let known = "";
+  function fill(ids) {
+    const all = Array.from(new Set(["AST-001"].concat(ids)));
+    if (all.join() === known) return;
+    known = all.join();
+    let cur = sel.value;
+    try { cur = cur || localStorage.getItem("sma_pulse_ast") || ""; } catch (e) {}
+    sel.innerHTML = all.map(a => `<option value="${esc(a)}">Пульс для: ${esc(a)}</option>`).join("");
+    sel.value = all.includes(cur) ? cur : all[0];
+  }
+  window.pulseCrew = fill;
+  fill([]);
+  sel.onchange = () => { try { localStorage.setItem("sma_pulse_ast", sel.value); } catch (e) {} };
+
+  async function postPulse(bpm, isFinal) {
+    try {
+      const r = await fetch("/api/pulse", { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ bpm, astronaut_id: sel.value, source:"camera-ppg", final: isFinal, ts: new Date().toISOString() }) });
+      const d = await r.json();
+      if (isFinal) $("pc-log").textContent = d.ok ? `Отправлено на панель: ${bpm} уд/мин (${d.astronaut})` : "Сервер отклонил: " + (d.error || "ошибка");
+    } catch (e) { if (isFinal) $("pc-log").textContent = "Не удалось отправить на сервер SMA Core."; }
+  }
+
+  async function start() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setState("Нужен https для камеры"); $("pc-log").textContent = "Откройте страницу по https-адресу (см. подсказку ниже)."; return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:320 }, height:{ ideal:240 }, frameRate:{ ideal:30 } }, audio:false });
+    } catch (e) { setState("Нет доступа к камере"); return; }
+    vid.srcObject = stream; await vid.play();
+    const tr = stream.getVideoTracks()[0];
+    try {
+      const cap = tr.getCapabilities && tr.getCapabilities();
+      if (cap && cap.torch) await tr.applyConstraints({ advanced:[{ torch:true }] });
+      else setState("Вспышка недоступна: подсветите палец фонариком");
+    } catch (e) {}
+    S = []; lastBpm = null; finalBpm = null; lastLive = 0; t0 = performance.now();
+    $("pc-bpm").textContent = "—"; $("pc-prog").style.width = "0"; $("pc-log").textContent = ""; $("pc-ai").textContent = "";
+    $("pc-start").disabled = true; $("pc-stop").disabled = false; $("pc-ai-btn").disabled = true; sel.disabled = true;
+    timer = setInterval(frame, 33);
+  }
+
+  function stop() {
+    clearInterval(timer); timer = null;
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    $("pc-start").disabled = false; $("pc-stop").disabled = true; sel.disabled = false;
+    $("pc-ai-btn").disabled = !(finalBpm || lastBpm);
+  }
+
+  function frame() {
+    const now = performance.now();
+    cx.drawImage(vid, 0, 0, 24, 24);
+    const d = cx.getImageData(0, 0, 24, 24).data, n = d.length / 4;
+    let r = 0, g = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; }
+    r /= n; g /= n;
+    const finger = r > 90 && r / (g + 1) > 1.7;
+    if (!finger) { S = []; setState("Закройте камеру пальцем"); draw(null); return; }
+    S.push({ t:now, v:r });
+    while (S.length && now - S[0].t > 12000) S.shift();
+    const el = now - t0;
+    $("pc-prog").style.width = Math.min(100, el / DUR * 100) + "%";
+    if (S.length < 60) { setState("Определяю сигнал…"); return; }
+    const f = filt(); analyze(f); draw(f);
+    if (lastBpm && now - lastLive > 3000) { lastLive = now; postPulse(lastBpm, false); }
+    if (el >= DUR && lastBpm) {
+      finalBpm = lastBpm; setState("Готово"); stop();
+      postPulse(finalBpm, true).then(aiAnalyze);
+    }
+  }
+
+  function mavg(a, w) {
+    const o = new Array(a.length), q = []; let s = 0;
+    for (let i = 0; i < a.length; i++) { s += a[i]; q.push(a[i]); if (q.length > w) s -= q.shift(); o[i] = s / q.length; }
+    return o;
+  }
+
+  function filt() {
+    const n = S.length, dur = (S[n - 1].t - S[0].t) / 1000, fps = n / dur;
+    const v = S.map(p => p.v);
+    const a = mavg(v, Math.max(2, Math.round(fps * 0.12)));
+    const b = mavg(v, Math.max(6, Math.round(fps * 0.9)));
+    return a.map((x, i) => -(x - b[i]));
+  }
+
+  function analyze(f) {
+    const n = S.length, fps = n / ((S[n - 1].t - S[0].t) / 1000), skip = Math.round(fps);
+    let m = 0, sd = 0; const c = f.length - skip;
+    for (let i = skip; i < f.length; i++) m += f[i];
+    m /= c;
+    for (let i = skip; i < f.length; i++) sd += (f[i] - m) * (f[i] - m);
+    sd = Math.sqrt(sd / c);
+    if (sd < 0.05) { setState("Сигнал слабый, прижмите палец"); return; }
+    const minGap = Math.round(fps * 0.33), peaks = [];
+    for (let i = skip + 1; i < f.length - 1; i++) {
+      if (f[i] > f[i - 1] && f[i] >= f[i + 1] && f[i] > m + 0.4 * sd) {
+        if (peaks.length && i - peaks[peaks.length - 1] < minGap) {
+          if (f[i] > f[peaks[peaks.length - 1]]) peaks[peaks.length - 1] = i;
+        } else peaks.push(i);
+      }
+    }
+    if (peaks.length < 4) { setState("Определяю пульс…"); return; }
+    const iv = [];
+    for (let i = 1; i < peaks.length; i++) iv.push((S[peaks[i]].t - S[peaks[i - 1]].t) / 1000);
+    iv.sort((x, y) => x - y);
+    const bpm = Math.round(60 / iv[Math.floor(iv.length / 2)]);
+    if (bpm < 40 || bpm > 190) { setState("Сигнал нестабилен"); return; }
+    lastBpm = lastBpm ? Math.round(lastBpm * 0.7 + bpm * 0.3) : bpm;
+    $("pc-bpm").textContent = lastBpm;
+    setState("Измеряю…");
+  }
+
+  function draw(f) {
+    const W = wave.width, H = wave.height;
+    wctx.clearRect(0, 0, W, H);
+    if (!f || f.length < 10) return;
+    const seg = f.slice(f.length - Math.round(f.length / 2));
+    let mx = 0; seg.forEach(x => { mx = Math.max(mx, Math.abs(x)); }); mx = mx || 1;
+    wctx.strokeStyle = "#ff5d5d"; wctx.lineWidth = 2.5; wctx.lineJoin = "round"; wctx.beginPath();
+    seg.forEach((x, i) => {
+      const px = i / (seg.length - 1) * W, py = H / 2 - (x / mx) * (H / 2 - 10);
+      i ? wctx.lineTo(px, py) : wctx.moveTo(px, py);
+    });
+    wctx.stroke();
+  }
+
+  async function aiAnalyze() {
+    const out = $("pc-ai");
+    out.textContent = "ИИ анализирует…";
+    try {
+      const d = await (await fetch("/api/ai/analyze?astronaut=" + encodeURIComponent(sel.value))).json();
+      out.textContent = d.answer;
+      speakIf(d.answer);
+    } catch (e) { out.textContent = "Нет связи с сервером SMA Core."; }
+  }
+  const speakIf = t => { if (voiceAlerts) speak(t); };
+
+  $("pc-start").onclick = start;
+  $("pc-stop").onclick = stop;
+  $("pc-ai-btn").onclick = aiAnalyze;
+  window.addEventListener("pagehide", () => { if (stream) stop(); });
+})();
+
+loadConditions();
+connectWS();
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
